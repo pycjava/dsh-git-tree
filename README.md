@@ -15,7 +15,11 @@ with a click-to-open picker for manually switching local branches.
 - 当前分支、本地分支列表、工作区是否 dirty 一目了然；分支状态每 5 秒刷新一次，窗口重新聚焦时强制刷新。
 - 点击徽章/下拉框展开分支列表，点选分支执行 `git switch --quiet -- <branch>`。
 - 切换失败（例如有未提交改动且无法自动合并）会在菜单内显示 git 的原始错误，**绝不强切、绝不 stash、绝不丢弃改动**。
-- 提供文本命令：`/git status`、`/git branches`、`/git switch <branch>`。
+- 分支下拉框底部新增「查看 Git 图谱」入口，点击即在菜单内以 **VSCode Git Graph 风格的
+  节点+连线图谱**渲染全部提交（默认 100 条）：每条提交是一个彩色节点，父提交间以折线相连，
+  分支按道次上色；行内显示提交信息、分支/标签徽章（与所在分支同色）、作者、相对时间与短哈希。
+  非 repo 时该入口不出现。
+- 提供文本命令：`/git status`、`/git branches`、`/git switch <branch>`、`/git graph [count] [--no-all]`。
 - 所有 git 命令都针对会话的 `cwd`；多个会话共享同一仓库时，一个会话切换后其他会话的徽章会自动跟上。
 
 ## 安装
@@ -41,6 +45,8 @@ dsh plugin --profile headless add .
    这个即将开始会话的工作区；只在空白新会话阶段可见。
 3. 点击分支徽章/下拉框 → 弹出本地分支列表。
 4. 点击目标分支 → 执行切换；当前分支带 `✓`，dirty 时徽章上有橙色圆点。
+5. 点击分支列表底部的「查看 Git 图谱」→ 在同一个菜单里查看 VSCode 风格的提交图谱
+   （节点连线 + 提交信息 + 分支标签徽章）；可用「刷新」重新拉取，用「返回分支」回到分支列表。
 
 命令行：
 
@@ -48,6 +54,9 @@ dsh plugin --profile headless add .
 /git status              # 当前分支 + 是否 dirty + repo 路径
 /git branches            # 列出本地分支
 /git switch feat/foo     # 切换到 feat/foo
+/git graph                # 查看提交图谱（默认全部 ref，前 100 条）
+/git graph 200            # 查看前 200 条
+/git graph --no-all       # 只看当前 HEAD 所在的分支
 ```
 
 ## 插件结构
@@ -70,7 +79,9 @@ scripts/check.mjs  node --check 语法门禁
   - `conversation.input.right`（list slot，`scope: session`）：新建会话页输入框右下角的
     Agent/模型选择器旁一个，组件内按 `composerPhase === 'blank'` 门控，仅空白新会话阶段渲染。
   - 两处共用同一个 `GitBranchAction` 组件，各自轮询 `/git-branch` loopback RPC。
-- **RPC**：`state { sessionId, force? }` 与 `switch { sessionId, branch }`。
+- **RPC**：`state { sessionId, force? }`、`switch { sessionId, branch }` 与
+  `graph { sessionId, count?, all? }`（返回 `{ cwd, all, count, lines, truncated, commits }`，
+  `commits` 为结构化提交数据，供图谱渲染）。
   只监听 loopback（`authority: 'loopback'`），不暴露给模型或外部网络。
 
 ## 配置

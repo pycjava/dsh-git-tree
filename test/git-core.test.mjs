@@ -5,6 +5,9 @@ import {
   detachedLabel,
   firstLine,
   parseBranchList,
+  parseGraph,
+  parseLogCommits,
+  parseRefs,
   publicState,
 } from '../lib/git-core.js'
 
@@ -37,10 +40,17 @@ test('detachedLabel renders a stable detached label', () => {
   assert.equal(detachedLabel(''), 'detached')
 })
 
+test('parseGraph trims trailing blanks, caps lines, and reports truncation', () => {
+  assert.deepEqual(parseGraph('* a\n* b\n\n\n', 100), { lines: ['* a', '* b'], truncated: false })
+  assert.deepEqual(parseGraph('* 1\n* 2\n* 3', 2), { lines: ['* 1', '* 2'], truncated: true })
+  assert.deepEqual(parseGraph(undefined, 5), { lines: [], truncated: false })
+  assert.deepEqual(parseGraph('* a\r\n* b\r\n\r\n', 100), { lines: ['* a', '* b'], truncated: false })
+})
+
 test('publicState projects probe results into the wire shape', () => {
-  assert.deepEqual(publicState({ repo: false, cwd: 'C:\\work', branch: null, dirty: false, detached: false, branches: [] }), {
+  assert.deepEqual(publicState({ repo: false, cwd: 'C:\work', branch: null, dirty: false, detached: false, branches: [] }), {
     repo: false,
-    cwd: 'C:\\work',
+    cwd: 'C:\work',
     branch: null,
     detached: false,
     dirty: false,
@@ -51,4 +61,38 @@ test('publicState projects probe results into the wire shape', () => {
     { repo: true, cwd: '/repo', branch: 'main', detached: false, dirty: true, branches: ['dev', 'main'] },
   )
   assert.equal(publicState({ repo: true, cwd: '/repo', branch: 'detached (abc)', dirty: false, detached: true, branches: [] }).detached, true)
+})
+
+test('parseRefs parses HEAD, branches, tags and dedupes', () => {
+  assert.deepEqual(parseRefs('HEAD -> main, origin/main, tag: v1.0, HEAD'), [
+    { type: 'head', name: 'main' },
+    { type: 'branch', name: 'origin/main' },
+    { type: 'tag', name: 'v1.0' },
+    { type: 'HEAD', name: 'HEAD' },
+  ])
+  assert.deepEqual(parseRefs(''), [])
+  assert.deepEqual(parseRefs(undefined), [])
+})
+
+test('parseLogCommits parses unit-separated log rows into commit objects', () => {
+  const SEP = String.fromCharCode(31) // \x1f field separator
+  const out = [
+    SEP + 'a'.repeat(40) + SEP + 'ab' + SEP + 'parent1 parent2' + SEP + 'Alice' + SEP + '2026-08-17T10:00:00+08:00' + SEP + 'HEAD -> main' + SEP + 'first commit',
+    SEP + 'b'.repeat(40) + SEP + 'bc' + SEP + '' + SEP + 'Bob' + SEP + '2026-08-16T09:00:00Z' + SEP + '' + SEP + 'second commit',
+    '',
+  ].join('\n')
+  const commits = parseLogCommits(out)
+  assert.equal(commits.length, 2)
+  assert.deepEqual(commits[0], {
+    id: 'a'.repeat(40),
+    hash: 'ab',
+    parents: ['parent1', 'parent2'],
+    author: 'Alice',
+    date: '2026-08-17T10:00:00+08:00',
+    refs: [{ type: 'head', name: 'main' }],
+    subject: 'first commit',
+  })
+  assert.deepEqual(commits[1].parents, [])
+  assert.equal(commits[1].refs.length, 0)
+  assert.equal(commits[1].subject, 'second commit')
 })
