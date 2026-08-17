@@ -1,18 +1,22 @@
 # dsh-git-tree
 
-在 **每个 DSH 会话的标题栏**显示当前 Git 分支，点击即可选择本地分支并手动切换。
+在每个 DSH 会话的标题栏，以及**新建会话页（输入框右下角、Agent/模型选择器旁）**显示当前 Git 分支，
+点击即可选择本地分支并手动切换。
 
-Show the current Git branch in **every DSH session header**, with a click-to-open
-picker for manually switching local branches.
+Show the current Git branch in **every DSH session header** and on the
+**new-session screen (bottom-right of the composer, beside the Agent/model seat)**,
+with a click-to-open picker for manually switching local branches.
 
 ## 功能
 
 - 会话标题栏新增 `⎇ <branch>` 徽章（位于 agent-preset 徽章之后）。
+- 新建会话页的输入框右下角（Agent/模型选择器旁）显示同一个 `⎇ <branch>` 分支下拉框；
+  只在「空白新会话」阶段出现，发送第一条消息后自动隐藏，与 Agent 预设芯片的展示时机一致。
 - 当前分支、本地分支列表、工作区是否 dirty 一目了然；分支状态每 5 秒刷新一次，窗口重新聚焦时强制刷新。
-- 点击徽章展开分支列表，点选分支执行 `git switch --quiet -- <branch>`。
+- 点击徽章/下拉框展开分支列表，点选分支执行 `git switch --quiet -- <branch>`。
 - 切换失败（例如有未提交改动且无法自动合并）会在菜单内显示 git 的原始错误，**绝不强切、绝不 stash、绝不丢弃改动**。
 - 提供文本命令：`/git status`、`/git branches`、`/git switch <branch>`。
-- 所有 git 命令都针对 session header 里的 `cwd`；多个会话共享同一仓库时，一个会话切换后其他会话的徽章会自动跟上。
+- 所有 git 命令都针对会话的 `cwd`；多个会话共享同一仓库时，一个会话切换后其他会话的徽章会自动跟上。
 
 ## 安装
 
@@ -33,8 +37,10 @@ dsh plugin --profile headless add .
 ## 使用
 
 1. 打开任意会话，标题栏右侧会显示当前分支（无仓库时显示 `无 Git 仓库`）。
-2. 点击分支徽章 → 弹出本地分支列表。
-3. 点击目标分支 → 执行切换；当前分支带 `✓`，dirty 时徽章上有橙色圆点。
+2. 新建会话页输入框右下角（Agent/模型选择器旁）会显示同一分支下拉框，作用对象就是
+   这个即将开始会话的工作区；只在空白新会话阶段可见。
+3. 点击分支徽章/下拉框 → 弹出本地分支列表。
+4. 点击目标分支 → 执行切换；当前分支带 `✓`，dirty 时徽章上有橙色圆点。
 
 命令行：
 
@@ -59,9 +65,11 @@ scripts/check.mjs  node --check 语法门禁
 - **host 半部**：`ctx.gitTree` 服务，只依赖 `node:child_process` 与 cordis 基础库。
   读取 `session.header.cwd`，用 `git rev-parse` 找仓库根，`git symbolic-ref` /
   `for-each-ref` / `git status --porcelain` 读取状态；`git switch` 是唯一写操作。
-- **web 半部**：注册到官方扩展点
-  `conversation.session.header.actions`（list slot，`scope: session`），
-  每个会话实例各自轮询 `/git-branch` loopback RPC。
+- **web 半部**：注册到两个官方扩展点（无需修改 DSH 客户端源码，官方 rc.6 即自带）：
+  - `conversation.session.header.actions`（list slot，`scope: session`）：每个会话标题栏一个。
+  - `conversation.input.right`（list slot，`scope: session`）：新建会话页输入框右下角的
+    Agent/模型选择器旁一个，组件内按 `composerPhase === 'blank'` 门控，仅空白新会话阶段渲染。
+  - 两处共用同一个 `GitBranchAction` 组件，各自轮询 `/git-branch` loopback RPC。
 - **RPC**：`state { sessionId, force? }` 与 `switch { sessionId, branch }`。
   只监听 loopback（`authority: 'loopback'`），不暴露给模型或外部网络。
 
@@ -83,6 +91,11 @@ scripts/check.mjs  node --check 语法门禁
 - DSH 侧栏的会话行**没有逐行扩展槽**（`sidebar.workspaces` 是单槽，占位需要整体替换
   整个浏览器），因此分支显示落在每个会话自己的标题栏——这是官方契约允许的逐会话
   位置。侧栏行内直接显示分支需要修改 DSH 客户端源码。
+- 新建会话页**顶部 hero 行（工作区 + Agent 预设芯片那一行）没有官方 list 扩展槽**
+  （`conversation.hero.agentPreset` 是 single 槽，注册会替换掉 Agent 芯片），所以无法
+  在不改客户端源码的前提下把分支放到「Agent 芯片正右边」；本插件改而使用官方自带
+  的 `conversation.input.right`（输入框右下角，紧邻 Agent/模型选择器）。若必须放在
+  hero 行内，仍需改 DSH 客户端源码新增槽位。
 - 只列出并切换**本地分支**；remote-tracking ref、tag、detached HEAD 不提供选择。
 - 切换是普通 `git switch`：如果工作区改动与目标分支冲突，git 会拒绝并显示原因。
 
