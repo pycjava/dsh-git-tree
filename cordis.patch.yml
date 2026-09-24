@@ -3,8 +3,8 @@
 # profile's own cordis.patch.yml.
 #
 # One host-plane row carries both the host service (git inspection +
-# loopback RPC + /git command) and the browser half served from
-# lib/client.js via the package's dsh.client declaration.
+# /api/git-branch/* Fetch routes + /git command) and the browser half served
+# from lib/client.js via the package's dsh.client declaration.
 - insert:
     - id: dsh-git-tree
       name: dsh-git-tree

@@ -66,7 +66,7 @@ dsh plugin --profile headless add .
 ```
 cordis.patch.yml   bundle patch：插入一个 host 行
 lib/
-  index.js         host：GitTreeService（git 探测、/git-branch RPC、/git 命令）
+  index.js         host：GitTreeService（git 探测、/api/git-branch/* 路由、/git 命令）
   git-core.js      纯函数：分支名校验、git stdout 解析、wire state
   client.js        浏览器半部（手写 ModuleLoader bundle，零构建）
 test/              纯函数单测（node --test）
@@ -80,11 +80,12 @@ scripts/check.mjs  node --check 语法门禁
   - `conversation.session.header.actions`（list slot，`scope: session`）：每个会话标题栏一个。
   - `conversation.input.right`（list slot，`scope: session`）：新建会话页输入框右下角的
     Agent/模型选择器旁一个，组件内按 `composerPhase === 'blank'` 门控，仅空白新会话阶段渲染。
-  - 两处共用同一个 `GitBranchAction` 组件，各自轮询 `/git-branch` loopback RPC。
+  - 两处共用同一个 `GitBranchAction` 组件，各自轮询 `/api/git-branch/*` Fetch 路由。
 - **RPC**：`state { sessionId, force? }`、`switch { sessionId, branch }` 与
   `graph { sessionId, count?, all? }`（返回 `{ cwd, all, count, lines, truncated, commits }`，
   `commits` 为结构化提交数据，供图谱渲染）。
-  只监听 loopback（`authority: 'loopback'`），不暴露给模型或外部网络。
+  路由注册在共享 `/api` 通道的认证栅栏内（浏览器需先通过 Connection 认证），
+  不暴露给模型或外部网络。
 
 ## 配置
 
